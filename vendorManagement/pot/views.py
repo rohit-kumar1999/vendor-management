@@ -75,7 +75,9 @@ class PurchaseOrderById(APIView):
                 delivered_orders = orders.filter(delivery_date__lte=datetime.now())
                 delivery_rate = delivered_orders.count()*100/orders.count()
                 try:
-                    performace = Performance.objects.get(vendor__id=order_data.get('vendor_id'))
+                    today = datetime.today()
+                    performace = Performance.objects.get(vendor__id=order_data.get('vendor_id'), date__year=today.year,
+                                                         date__month=today.month, date__day=today.day)
                     performace.on_time_delivery_rate = delivery_rate
                     performace.quality_rating_avg = PurchaseOrder.objects.filter(
                             vendor__id=order_data.get('vendor_id'), status='completed').aggregate(Avg('quality_rating'))
@@ -106,3 +108,41 @@ class PurchaseOrderById(APIView):
             return Response({'error': 'Purchase Order does not exist of given id'}, status=status.HTTP_404_NOT_FOUND)
         order.delete()
         return Response("Purchase Order deleted successfully", status=status.HTTP_200_OK)
+
+
+class AcknowledgementView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = PurchaseOrder.objects.get(id=order_id)
+            order.acknowledgment_date = datetime.now()
+            order.save(update_fields=['acknowledgment_date'])
+            orders = PurchaseOrder.objects.filter(vendor__id=order.vendor.id)
+            orders_count = orders.cont()
+            total_response_time = 0
+
+            for o in orders:
+                total_response_time += (o.acknowledgment_date - o.issue_date)
+            avg_response_time = total_response_time/(orders_count or 1)
+            try:
+                today = datetime.today()
+                performance = Performance.objects.get(vendor__id=order.vendor.id, date__year=today.year,
+                                                      date__month=today.month, date__day=today.day)
+                performance.average_response_time = avg_response_time
+                performance.save(update_fields=['average_response_time'])
+            except:
+                Performance.objects.create(
+                    vendor_id=order.vendor.id,
+                    date=datetime.now(),
+                    on_time_delivery_rate=0,
+                    quality_rating_avg=0,
+                    average_response_time=avg_response_time,
+                    fulfillment_rate=0
+                )
+
+            modified_order = model_to_dict(order)
+            modified_order['id'] = order.id
+            return Response(modified_order, status=status.HTTP_200_OK)
+        except PurchaseOrder.DoesNotExist:
+            return Response({'error': 'Purchase Order does not exist of given id'}, status=status.HTTP_404_NOT_FOUND)
