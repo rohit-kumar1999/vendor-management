@@ -47,7 +47,6 @@ Configure the database settings in the settings.py file.
 
 ### Usage
 Log in with the superuser account created during installation.
-create JWT token with `api/jwt/token` api and refresh it `api/jwt/token/refresh` and pass access token as Bearer in order to use apis
-Explore the dashboard and navigate to different sections for vendor management.
+create JWT token with `api/jwt/token` api and refresh it `api/jwt/token/refresh` and pass access token as Bearer in order to use apis.
 
 Use the admin panel to add/edit vendors, manage orders, performance.
